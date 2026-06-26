@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { View, Text, StyleSheet, Pressable, Alert } from "react-native";
+import { View, Text, StyleSheet, Pressable } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Screen } from "@/components/Screen";
 import { PhotoGrid } from "@/components/PhotoGrid";
@@ -7,12 +7,14 @@ import { SelectionBar } from "@/components/SelectionBar";
 import { useTheme } from "@/components/ThemeProvider";
 import { useMediaLibrary } from "@/hooks/useMediaLibrary";
 import { useSelection } from "@/hooks/useSelection";
+import { useVaultStore } from "@/store/vault";
 import { useCustomAlbumsStore } from "@/store/customAlbums";
 import { columnsFor } from "@/utils/grid";
 import { useSettingsStore } from "@/store/settings";
 import { deleteItems, shareItems } from "@/utils/mediaActions";
 import type { MediaItem } from "@/types";
 import { radii, spacing } from "@/theme/colors";
+import { CustomAlert, CustomAlertButton } from "@/components/CustomAlert";
 
 export default function AlbumDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -25,6 +27,26 @@ export default function AlbumDetailScreen() {
 
   const sel = useSelection();
   const [busy, setBusy] = useState(false);
+
+  const [alert, setAlert] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    buttons: CustomAlertButton[];
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    buttons: [],
+  });
+
+  const showAlert = useCallback((title: string, message: string, buttons: CustomAlertButton[]) => {
+    setAlert({ visible: true, title, message, buttons });
+  }, []);
+
+  const hideAlert = useCallback(() => {
+    setAlert((a) => ({ ...a, visible: false }));
+  }, []);
 
   const isCustom = id.startsWith("cust:");
   const customRecord = customAlbums.find((a) => a.id === id);
@@ -64,44 +86,92 @@ export default function AlbumDetailScreen() {
 
   const selectedItems = useMemo(() => items.filter((i) => sel.selected.has(i.id)), [items, sel.selected]);
 
-  const doDelete = useCallback(async () => {
+  const deleteBehavior = useSettingsStore((s) => s.deleteBehavior);
+  const recycleRetentionDays = useSettingsStore((s) => s.recycleRetentionDays);
+
+  const executeDelete = useCallback(async () => {
     if (selectedItems.length === 0) return;
     setBusy(true);
     try {
       const result = await deleteItems(selectedItems);
       removeItems(result.removed);
-      Alert.alert(result.recycled ? "Moved to Recycle Bin" : "Deleted", `${result.removed.length} item(s)`);
+      showAlert(
+        result.recycled ? "Moved to Recycle Bin" : "Deleted",
+        result.recycled
+          ? `${result.removed.length} item(s) moved to the Recycle Bin successfully.`
+          : `${result.removed.length} item(s) permanently deleted.`,
+        [{ text: "OK", onPress: hideAlert }]
+      );
     } catch (err: any) {
       console.error("Album item deletion failed:", err);
-      Alert.alert("Error", err?.message ?? "Failed to delete selected items.");
+      showAlert("Error", err?.message ?? "Failed to delete selected items.", [{ text: "OK", onPress: hideAlert }]);
     } finally {
       sel.exit();
       setBusy(false);
     }
-  }, [selectedItems, removeItems, sel]);
+  }, [selectedItems, removeItems, sel, showAlert, hideAlert]);
+
+  const confirmDelete = useCallback(() => {
+    if (selectedItems.length === 0) return;
+
+    if (deleteBehavior === "recycle") {
+      showAlert(
+        "Move to Recycle Bin?",
+        `This will move ${selectedItems.length} selected item(s) to the Recycle Bin. They will be automatically deleted after ${recycleRetentionDays} days.\n\nTo delete them permanently, you can go to Settings, open the Recycle Bin, and purge them.`,
+        [
+          { text: "Cancel", onPress: hideAlert, style: "cancel" },
+          { text: "Move to Bin", onPress: () => { hideAlert(); executeDelete(); }, style: "destructive" }
+        ]
+      );
+    } else {
+      showAlert(
+        "Delete permanently?",
+        `Are you sure you want to permanently delete ${selectedItems.length} selected item(s) from your library? This action cannot be undone.`,
+        [
+          { text: "Cancel", onPress: hideAlert, style: "cancel" },
+          { text: "Delete", onPress: () => { hideAlert(); executeDelete(); }, style: "destructive" }
+        ]
+      );
+    }
+  }, [selectedItems, deleteBehavior, recycleRetentionDays, showAlert, hideAlert, executeDelete]);
+
+  const lockItems = useVaultStore((s) => s.lockItems);
+  const handleLockSelected = useCallback(() => {
+    if (selectedItems.length === 0) return;
+    const ids = selectedItems.map((i) => i.id);
+    lockItems(ids);
+    const count = ids.length;
+    sel.exit();
+    showAlert(
+      "Moved to Vault",
+      `${count} item(s) moved to the Private Vault.`,
+      [{ text: "OK", onPress: hideAlert }]
+    );
+  }, [selectedItems, lockItems, sel, showAlert, hideAlert]);
 
   const doShare = useCallback(async () => {
     await shareItems(selectedItems);
     sel.exit();
   }, [selectedItems, sel]);
 
-  const doDeleteAlbum = useCallback(() => {
-    Alert.alert(
+  const confirmDeleteAlbum = useCallback(() => {
+    showAlert(
       "Delete album?",
       `"${title}" will be removed. Your original photos are NOT deleted.`,
       [
-        { text: "Cancel", style: "cancel" },
+        { text: "Cancel", onPress: hideAlert, style: "cancel" },
         {
           text: "Delete album",
           style: "destructive",
           onPress: () => {
+            hideAlert();
             deleteAlbum(id);
             router.back();
           },
         },
       ],
     );
-  }, [title, id, deleteAlbum, router]);
+  }, [title, id, deleteAlbum, router, showAlert, hideAlert]);
 
   return (
     <Screen>
@@ -111,7 +181,7 @@ export default function AlbumDetailScreen() {
         </Pressable>
         <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>{title}</Text>
         {isCustom ? (
-          <Pressable onPress={doDeleteAlbum} hitSlop={12}>
+          <Pressable onPress={confirmDeleteAlbum} hitSlop={12}>
             <Text style={[styles.navBtn, { color: theme.danger }]}>Delete</Text>
           </Pressable>
         ) : <View style={{ width: 50 }} />}
@@ -134,10 +204,18 @@ export default function AlbumDetailScreen() {
           onClose={sel.exit}
           actions={[
             { label: "Share", onPress: doShare, disabled: selectedItems.length === 0 },
-            { label: "Delete", onPress: doDelete, destructive: true, disabled: busy },
+            { label: "Set as Private", onPress: handleLockSelected, disabled: selectedItems.length === 0 },
+            { label: "Delete", onPress: confirmDelete, destructive: true, disabled: busy },
           ]}
         />
       ) : null}
+
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        buttons={alert.buttons}
+      />
     </Screen>
   );
 }

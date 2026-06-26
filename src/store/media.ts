@@ -12,6 +12,8 @@ interface MediaStore {
   addItems: (items: MediaItem[]) => void;
 }
 
+let activeFetchId = 0;
+
 export const useMediaStore = create<MediaStore>((set, get) => ({
   items: [],
   loading: false,
@@ -21,29 +23,60 @@ export const useMediaStore = create<MediaStore>((set, get) => ({
     if (get().loading || (get().loaded && !force)) return;
 
     set({ loading: true, error: null });
+    const fetchId = ++activeFetchId;
     try {
       // Step 1: Fetch the first 60 assets instantly (takes ~50-100ms)
       const firstPage = await mediaService.getAll(60);
+      
+      if (fetchId !== activeFetchId) return;
       set({ items: firstPage, loaded: true, loading: false });
 
-      // Step 2: Fetch all items in the background without blocking the UI
-      mediaService.getAll().then((allItems) => {
-        const currentItems = get().items;
-        const capturedIds = new Set(
-          currentItems.filter((i) => i.id.startsWith("captured_")).map((i) => i.id)
-        );
+      // Step 2: Fetch remaining items in the background incrementally without blocking the UI
+      (async () => {
+        let offset = 60;
+        const limit = 100;
+        let hasMore = true;
 
-        // Merge the background items with any locally captured mock items
-        const capturedItems = currentItems.filter((i) => capturedIds.has(i.id));
-        const merged = [...capturedItems, ...allItems.filter((i) => !capturedIds.has(i.id))];
-        merged.sort((a, b) => b.creationTime - a.creationTime);
+        while (hasMore) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          if (fetchId !== activeFetchId) break;
 
-        set({ items: merged });
-      }).catch((err) => {
+          const nextPage = await mediaService.getAll(limit, offset);
+          if (fetchId !== activeFetchId) break;
+
+          if (nextPage.length === 0) {
+            hasMore = false;
+            break;
+          }
+
+          const currentItems = get().items;
+          const capturedIds = new Set(
+            currentItems.filter((i) => i.id.startsWith("captured_")).map((i) => i.id)
+          );
+
+          const capturedItems = currentItems.filter((i) => capturedIds.has(i.id));
+          const otherCurrentItems = currentItems.filter((i) => !capturedIds.has(i.id));
+          const existingIds = new Set(otherCurrentItems.map((i) => i.id));
+
+          const newUniquePage = nextPage.filter((i) => !existingIds.has(i.id));
+          if (newUniquePage.length === 0) {
+            hasMore = false;
+            break;
+          }
+
+          const merged = [...capturedItems, ...otherCurrentItems, ...newUniquePage];
+          merged.sort((a, b) => b.creationTime - a.creationTime);
+
+          set({ items: merged });
+          offset += nextPage.length;
+        }
+      })().catch((err) => {
         console.warn("Background media fetch failed:", err);
       });
     } catch (err: any) {
-      set({ error: err?.message ?? "Failed to load media", loading: false });
+      if (fetchId === activeFetchId) {
+        set({ error: err?.message ?? "Failed to load media", loading: false });
+      }
     }
   },
   removeItems: (ids) => {

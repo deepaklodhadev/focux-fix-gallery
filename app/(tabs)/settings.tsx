@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef } from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, Switch, PanResponder } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView, Switch } from "react-native";
 import { useRouter } from "expo-router";
 import Svg, { Path } from "react-native-svg";
 import { Screen } from "@/components/Screen";
@@ -20,12 +20,44 @@ const BackIcon = ({ color }: { color: string }) => (
   </Svg>
 );
 
+const ChevronIcon = ({ expanded, color }: { expanded: boolean; color: string }) => (
+  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" style={{ transform: [{ rotate: expanded ? "180deg" : "0deg" }] }}>
+    <Path d="M6 9l6 6 6-6" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+function formatBytes(bytes: number, decimals = 1) {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
+}
+
 export default function SettingsScreen() {
   const theme = useTheme();
   const router = useRouter();
   const s = useSettingsStore();
   const binCount = useRecycleBinStore((st) => st.items.length);
   const { allItems } = useMediaLibrary();
+  const [foldersExpanded, setFoldersExpanded] = useState(false);
+
+  // Storage telemetry computations
+  const stats = useMemo(() => {
+    const photos = allItems.filter((i) => !i.isVideo);
+    const videos = allItems.filter((i) => i.isVideo);
+
+    const photoCount = photos.length;
+    const videoCount = videos.length;
+
+    // Typical file sizes (approx: 3.2 MB per photo, 1.8 MB per second of video)
+    const photoSizeEst = photoCount * 3.2 * 1024 * 1024;
+    const videoSizeEst = videos.reduce((acc, v) => acc + (v.duration || 10) * 1.8 * 1024 * 1024, 0);
+    const totalSize = photoSizeEst + videoSizeEst;
+
+    return { photoCount, videoCount, photoSizeEst, videoSizeEst, totalSize };
+  }, [allItems]);
 
   // Distinct folders for the hidden-folders picker.
   const folders = useMemo(() => [...new Set(allItems.map((i) => i.folder))].sort(), [allItems]);
@@ -37,10 +69,47 @@ export default function SettingsScreen() {
         <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
           <BackIcon color={theme.accent} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Settings</Text>
+        <Text style={[styles.headerTitle, { color: theme.accent }]}>Settings</Text>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.md, paddingBottom: 48 }}>
+        <Section title="Storage telemetry">
+          <Card>
+            <View style={styles.storageStats}>
+              <View style={styles.storageHeader}>
+                <Text style={[styles.cardTitle, { color: theme.text }]}>Gallery Storage</Text>
+                <Text style={[styles.storageTotal, { color: theme.accent }]}>{formatBytes(stats.totalSize)}</Text>
+              </View>
+              
+              {/* Progress Bar */}
+              <View style={[styles.progressBar, { backgroundColor: theme.surfaceMuted }]}>
+                {stats.totalSize > 0 && (
+                  <>
+                    <View style={[styles.progressPhotos, { width: `${(stats.photoSizeEst / stats.totalSize) * 100}%`, backgroundColor: theme.accent }]} />
+                    <View style={[styles.progressVideos, { width: `${(stats.videoSizeEst / stats.totalSize) * 100}%`, backgroundColor: "#8b5cf6" }]} />
+                  </>
+                )}
+              </View>
+
+              {/* Breakdown */}
+              <View style={styles.breakdown}>
+                <View style={styles.breakdownItem}>
+                  <View style={[styles.dot, { backgroundColor: theme.accent }]} />
+                  <Text style={[styles.breakdownLabel, { color: theme.textMuted }]}>
+                    Photos ({stats.photoCount}): <Text style={{ color: theme.text, fontWeight: "600" }}>{formatBytes(stats.photoSizeEst)}</Text>
+                  </Text>
+                </View>
+                <View style={styles.breakdownItem}>
+                  <View style={[styles.dot, { backgroundColor: "#8b5cf6" }]} />
+                  <Text style={[styles.breakdownLabel, { color: theme.textMuted }]}>
+                    Videos ({stats.videoCount}): <Text style={{ color: theme.text, fontWeight: "600" }}>{formatBytes(stats.videoSizeEst)}</Text>
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </Card>
+        </Section>
+
         <Section title="Display">
           <Card>
             <Row
@@ -72,43 +141,56 @@ export default function SettingsScreen() {
 
         <Section title="Hidden folders">
           <Card>
-            <Label title="Excluded folders" subtitle="These won't appear in Timeline or Albums" />
-            {folders.length === 0 ? (
-              <View style={[styles.emptyFoldersCard, { borderColor: theme.border }]}>
-                <Text style={[styles.emptyFoldersText, { color: theme.textMuted }]}>
-                  No folders available.
+            <Pressable onPress={() => setFoldersExpanded(!foldersExpanded)} style={styles.collapsibleHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.cardTitle, { color: theme.text }]}>Excluded folders</Text>
+                <Text style={[styles.cardSub, { color: theme.textMuted }]}>
+                  {foldersExpanded 
+                    ? "Choose which folders to show or hide" 
+                    : `${folders.length} folder${folders.length === 1 ? "" : "s"} available (Tap to edit)`}
                 </Text>
               </View>
-            ) : (
-              <View style={{ marginTop: spacing.sm }}>
-                {folders.map((f, idx) => {
-                  const hidden = s.hiddenFolders.includes(f);
-                  return (
-                    <View key={f}>
-                      {idx > 0 && <View style={[styles.divider, { backgroundColor: theme.border }]} />}
-                      <View style={styles.folderRow}>
-                        <View style={{ flex: 1, marginRight: spacing.sm }}>
-                          <Text style={[styles.folderName, { color: theme.text }]}>{f}</Text>
-                          <Text style={[styles.folderSub, { color: theme.textMuted }]}>
-                            {hidden ? "Excluded from library" : "Visible in timeline"}
-                          </Text>
+              <ChevronIcon expanded={foldersExpanded} color={theme.accent} />
+            </Pressable>
+
+            {foldersExpanded && (
+              folders.length === 0 ? (
+                <View style={[styles.emptyFoldersCard, { borderColor: theme.border, marginTop: spacing.md }]}>
+                  <Text style={[styles.emptyFoldersText, { color: theme.textMuted }]}>
+                    No folders available.
+                  </Text>
+                </View>
+              ) : (
+                <View style={{ marginTop: spacing.md }}>
+                  {folders.map((f, idx) => {
+                    const hidden = s.hiddenFolders.includes(f);
+                    return (
+                      <View key={f}>
+                        {idx > 0 && <View style={[styles.divider, { backgroundColor: theme.border }]} />}
+                        <View style={styles.folderRow}>
+                          <View style={{ flex: 1, marginRight: spacing.sm }}>
+                            <Text style={[styles.folderName, { color: theme.text }]}>{f}</Text>
+                            <Text style={[styles.folderSub, { color: theme.textMuted }]}>
+                              {hidden ? "Excluded from library" : "Visible in timeline"}
+                            </Text>
+                          </View>
+                          <Switch
+                            value={!hidden}
+                            onValueChange={() => s.toggleHiddenFolder(f)}
+                            thumbColor={!hidden ? theme.accent : "#ccc"}
+                            trackColor={{ true: theme.accent + "55", false: theme.surfaceMuted }}
+                          />
                         </View>
-                        <Switch
-                          value={!hidden}
-                          onValueChange={() => s.toggleHiddenFolder(f)}
-                          thumbColor={!hidden ? theme.accent : "#ccc"}
-                          trackColor={{ true: theme.accent + "55", false: theme.surfaceMuted }}
-                        />
                       </View>
-                    </View>
-                  );
-                })}
-              </View>
+                    );
+                  })}
+                </View>
+              )
             )}
           </Card>
         </Section>
 
-        <Section title="Delete">
+        <Section title="Safety & Deletion">
           <Card>
             <Label title="Delete behavior" subtitle="What happens when you delete photos" />
             <Segmented<DeleteBehavior>
@@ -121,30 +203,59 @@ export default function SettingsScreen() {
             />
           </Card>
           <Card>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
-              <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <View style={{ flex: 1, marginRight: spacing.md }}>
                 <Text style={[styles.cardTitle, { color: theme.text }]}>Recycle Bin retention</Text>
-                <Text style={[styles.cardSub, { color: theme.textMuted }]}>Auto-delete after {s.recycleRetentionDays} days</Text>
+                <Text style={[styles.cardSub, { color: theme.textMuted }]}>Auto-delete after defined days</Text>
               </View>
-              <Text style={{ fontSize: 24, fontWeight: "700", color: theme.accent }}>{s.recycleRetentionDays}</Text>
+              
+              <View style={[styles.stepperContainer, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}>
+                <Pressable
+                  onPress={() => s.setRecycleRetentionDays(Math.max(1, s.recycleRetentionDays - 1))}
+                  style={({ pressed }) => [
+                    styles.stepperBtn,
+                    { opacity: pressed ? 0.65 : 1 }
+                  ]}
+                  hitSlop={12}
+                >
+                  <Text style={[styles.stepperBtnText, { color: theme.text }]}>−</Text>
+                </Pressable>
+
+                <View style={styles.stepperValueContainer}>
+                  <Text style={[styles.stepperValueText, { color: theme.accent }]}>{s.recycleRetentionDays}</Text>
+                  <Text style={[styles.stepperUnitText, { color: theme.textMuted }]}>
+                    {s.recycleRetentionDays === 1 ? "day" : "days"}
+                  </Text>
+                </View>
+
+                <Pressable
+                  onPress={() => s.setRecycleRetentionDays(Math.min(90, s.recycleRetentionDays + 1))}
+                  style={({ pressed }) => [
+                    styles.stepperBtn,
+                    { opacity: pressed ? 0.65 : 1 }
+                  ]}
+                  hitSlop={12}
+                >
+                  <Text style={[styles.stepperBtnText, { color: theme.text }]}>+</Text>
+                </Pressable>
+              </View>
             </View>
-            <CustomSlider
-              value={s.recycleRetentionDays}
-              min={1}
-              max={90}
-              onChange={s.setRecycleRetentionDays}
-            />
           </Card>
           <Card>
             <Pressable onPress={() => router.push("/recycle")}>
               <Row title="Recycle Bin" subtitle={`${binCount} item(s)`} right={<Text style={{ color: theme.textSubtle, fontSize: 18 }}>›</Text>} />
             </Pressable>
           </Card>
+          <Card>
+            <Pressable onPress={() => router.push("/vault")}>
+              <Row title="Private Vault" subtitle="Keep sensitive photos and videos secure" right={<Text style={{ color: theme.textSubtle, fontSize: 18 }}>›</Text>} />
+            </Pressable>
+          </Card>
         </Section>
 
         {/* Clean, centered Obsidian-style version info directly on the screen background */}
         <View style={styles.aboutContainer}>
-          <Text style={[styles.aboutTitle, { color: theme.accent }]}>FocusPix</Text>
+          <Text style={[styles.aboutTitle, { color: theme.accent }]}>Foco Gallery</Text>
           <Text style={[styles.aboutSub, { color: theme.textSubtle }]}>
             VERSION {APP_VERSION} · {mediaService.isMock ? "SAMPLE" : "STABLE"}
           </Text>
@@ -234,102 +345,21 @@ function Segmented<T extends string>({
   );
 }
 
-function CustomSlider({
-  value,
-  min,
-  max,
-  onChange,
-}: {
-  value: number;
-  min: number;
-  max: number;
-  onChange: (v: number) => void;
-}) {
-  const theme = useTheme();
-  const [trackWidth, setTrackWidth] = useState(0);
-  const containerRef = useRef<View>(null);
-  const [trackLeft, setTrackLeft] = useState(0);
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) => {
-        if (containerRef.current) {
-          containerRef.current.measure((x, y, width, height, pageX, pageY) => {
-            setTrackLeft(pageX);
-            setTrackWidth(width);
-            const relativeX = evt.nativeEvent.pageX - pageX;
-            const percentage = Math.max(0, Math.min(1, relativeX / width));
-            const rawVal = min + percentage * (max - min);
-            onChange(Math.round(rawVal));
-          });
-        }
-      },
-      onPanResponderMove: (evt) => {
-        const relativeX = evt.nativeEvent.pageX - trackLeft;
-        const percentage = Math.max(0, Math.min(1, relativeX / trackWidth));
-        const rawVal = min + percentage * (max - min);
-        onChange(Math.round(rawVal));
-      },
-      onPanResponderRelease: () => {},
-    })
-  ).current;
-
-  const percentage = (value - min) / (max - min);
-
-  return (
-    <View style={{ marginTop: spacing.sm }}>
-      <View
-        ref={containerRef}
-        style={styles.sliderTrackContainer}
-        {...panResponder.panHandlers}
-        onLayout={() => {
-          if (containerRef.current) {
-            containerRef.current.measure((x, y, width, height, pageX, pageY) => {
-              setTrackLeft(pageX);
-              setTrackWidth(width);
-            });
-          }
-        }}
-      >
-        {/* Track Line */}
-        <View style={[styles.sliderTrack, { backgroundColor: theme.surfaceMuted }]}>
-          <View
-            style={[
-              styles.sliderActiveTrack,
-              { width: `${percentage * 100}%`, backgroundColor: theme.accent },
-            ]}
-          />
-        </View>
-        {/* Thumb */}
-        <View
-          style={[
-            styles.sliderThumb,
-            {
-              left: `${percentage * 100}%`,
-              backgroundColor: theme.accent,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.2,
-              shadowRadius: 1,
-              elevation: 1,
-            },
-          ]}
-        />
-      </View>
-      {/* Min/Max Labels */}
-      <View style={styles.sliderLabels}>
-        <Text style={[styles.sliderLabelText, { color: theme.textSubtle }]}>{min}DAY</Text>
-        <Text style={[styles.sliderLabelText, { color: theme.textSubtle }]}>{max} DAYS</Text>
-      </View>
-    </View>
-  );
-}
+// Stepper counter control replaces CustomSlider
 
 const styles = StyleSheet.create({
   sectionTitle: { fontSize: 12, fontWeight: "700", letterSpacing: 0.5, marginBottom: spacing.xs, paddingHorizontal: spacing.xs },
   card: { borderRadius: radii.lg, padding: spacing.md },
+  storageStats: { gap: spacing.md },
+  storageHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  storageTotal: { fontSize: 18, fontWeight: "700" },
+  progressBar: { height: 8, borderRadius: 4, flexDirection: "row", overflow: "hidden" },
+  progressPhotos: { height: "100%" },
+  progressVideos: { height: "100%" },
+  breakdown: { gap: spacing.xs, marginTop: spacing.xs },
+  breakdownItem: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  breakdownLabel: { fontSize: 12 },
   cardTitle: { fontSize: 15, fontWeight: "600" },
   cardSub: { fontSize: 13, marginTop: 2 },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
@@ -339,6 +369,11 @@ const styles = StyleSheet.create({
   folderName: { fontSize: 14, fontWeight: "600" },
   folderSub: { fontSize: 11, marginTop: 1 },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: spacing.xs },
+  collapsibleHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -356,8 +391,9 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 26,
     fontWeight: "800",
+    letterSpacing: -0.5,
   },
   emptyFoldersCard: {
     borderWidth: 1,
@@ -372,37 +408,40 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     fontSize: 13,
   },
-  sliderTrackContainer: {
-    height: 30,
+  stepperContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 4,
+  },
+  stepperBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
     justifyContent: "center",
-    position: "relative",
   },
-  sliderTrack: {
-    height: 4,
-    borderRadius: 2,
+  stepperBtnText: {
+    fontSize: 20,
+    fontWeight: "600",
+    lineHeight: 22,
+  },
+  stepperValueContainer: {
     flexDirection: "row",
-    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 56,
+    gap: 2,
   },
-  sliderActiveTrack: {
-    height: "100%",
-  },
-  sliderThumb: {
-    position: "absolute",
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    top: "50%",
-    transform: [{ translateY: -7 }, { translateX: -7 }],
-  },
-  sliderLabels: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: spacing.xs,
-  },
-  sliderLabelText: {
-    fontSize: 9,
+  stepperValueText: {
+    fontSize: 15,
     fontWeight: "700",
-    letterSpacing: 0.5,
+  },
+  stepperUnitText: {
+    fontSize: 10,
+    fontWeight: "600",
   },
   aboutContainer: {
     alignItems: "center",

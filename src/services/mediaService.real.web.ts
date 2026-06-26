@@ -3,7 +3,7 @@ import type { MediaItem } from "@/types";
 
 export const realMediaService: MediaService = {
   isMock: false,
-  async getAll(limit?: number): Promise<MediaItem[]> {
+  async getAll(limit?: number, offset?: number): Promise<MediaItem[]> {
     console.warn("Real media library is not supported on the web platform.");
     return [];
   },

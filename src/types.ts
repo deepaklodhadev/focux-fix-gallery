@@ -1,4 +1,4 @@
-// Core domain types for FocusPix.
+// Core domain types for Foco Gallery.
 
 /** A single photo or video, normalized from either the mock or real media layer. */
 export interface MediaItem {

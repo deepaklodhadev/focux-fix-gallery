@@ -49,7 +49,7 @@ export const useCustomAlbumsStore = create<CustomAlbumsStore>()(
         })),
     }),
     {
-      name: "focuspix.customAlbums",
+      name: "foco.customAlbums",
       storage: createJSONStorage(() => AsyncStorage),
     },
   ),

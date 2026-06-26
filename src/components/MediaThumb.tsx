@@ -43,7 +43,8 @@ export const MediaThumb = React.memo(function MediaThumb({
       />
       {item.isVideo ? (
         <View style={styles.videoBadge} pointerEvents="none">
-          <Text style={styles.videoBadgeText}>📹</Text>
+          <Text style={[styles.playArrow, { color: theme.accent }]}>▶</Text>
+          <Text style={styles.videoDuration}>{formatDuration(item.duration)}</Text>
         </View>
       ) : null}
       {selectionMode ? (
@@ -73,18 +74,24 @@ const styles = StyleSheet.create({
   image: { width: "100%", height: "100%" },
   videoBadge: {
     position: "absolute",
-    top: 6,
+    bottom: 6,
     right: 6,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    width: 20,
-    height: 20,
-    borderRadius: 4,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 3,
   },
-  videoBadgeText: {
+  playArrow: {
+    fontSize: 9,
+    lineHeight: 11,
+  },
+  videoDuration: {
     color: "#fff",
     fontSize: 10,
+    fontWeight: "700",
   },
   check: {
     position: "absolute",

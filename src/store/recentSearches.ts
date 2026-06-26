@@ -25,7 +25,7 @@ export const useRecentSearchesStore = create<RecentSearchesStore>()(
       clear: () => set({ searches: [] }),
     }),
     {
-      name: "focuspix.recentSearches",
+      name: "foco.recentSearches",
       storage: createJSONStorage(() => AsyncStorage),
     },
   ),

@@ -16,7 +16,7 @@ export function ScreenHeader({ title, subtitle, right, onRightPress }: Props) {
   return (
     <View style={styles.wrap}>
       <View style={styles.titles}>
-        <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
+        <Text style={[styles.title, { color: theme.accent }]}>{title}</Text>
         {subtitle ? <Text style={[styles.subtitle, { color: theme.textMuted }]}>{subtitle}</Text> : null}
       </View>
       {right ? (
@@ -38,6 +38,6 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xs,
   },
   titles: { flex: 1 },
-  title: { fontSize: 28, fontWeight: "800", letterSpacing: -0.5 },
+  title: { fontSize: 26, fontWeight: "800", letterSpacing: -0.5 },
   subtitle: { fontSize: 13, marginTop: 2 },
 });

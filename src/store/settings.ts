@@ -41,7 +41,7 @@ export const useSettingsStore = create<SettingsStore>()(
       setTheme: (theme) => set({ theme }),
     }),
     {
-      name: "focuspix.settings",
+      name: "foco.settings",
       storage: createJSONStorage(() => AsyncStorage),
     },
   ),

@@ -9,12 +9,14 @@ import { SelectionBar } from "@/components/SelectionBar";
 import { useTheme } from "@/components/ThemeProvider";
 import { useMediaLibrary } from "@/hooks/useMediaLibrary";
 import { useSelection } from "@/hooks/useSelection";
+import { useVaultStore } from "@/store/vault";
 import { columnsFor } from "@/utils/grid";
 import { useSettingsStore } from "@/store/settings";
 import { deleteItems, shareItems } from "@/utils/mediaActions";
 import { mediaService } from "@/services";
 import { parseSearch, applySearch } from "@/utils/searchQuery";
 import { radii, spacing } from "@/theme/colors";
+import { CustomAlert, CustomAlertButton } from "@/components/CustomAlert";
 
 export default function TimelineScreen() {
   const theme = useTheme();
@@ -27,6 +29,26 @@ export default function TimelineScreen() {
 
   const sel = useSelection();
   const [busy, setBusy] = useState(false);
+
+  const [alert, setAlert] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    buttons: CustomAlertButton[];
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    buttons: [],
+  });
+
+  const showAlert = useCallback((title: string, message: string, buttons: CustomAlertButton[]) => {
+    setAlert({ visible: true, title, message, buttons });
+  }, []);
+
+  const hideAlert = useCallback(() => {
+    setAlert((a) => ({ ...a, visible: false }));
+  }, []);
 
   const filteredItems = useMemo(() => {
     if (!query.trim()) return visibleItems;
@@ -57,26 +79,68 @@ export default function TimelineScreen() {
     [filteredItems, sel.selected],
   );
 
-  const doDelete = useCallback(async () => {
+  const deleteBehavior = useSettingsStore((s) => s.deleteBehavior);
+  const recycleRetentionDays = useSettingsStore((s) => s.recycleRetentionDays);
+
+  const executeDelete = useCallback(async () => {
     if (selectedItems.length === 0) return;
     setBusy(true);
     try {
       const result = await deleteItems(selectedItems);
       removeItems(result.removed);
-      Alert.alert(
+      showAlert(
         result.recycled ? "Moved to Recycle Bin" : "Deleted",
         result.recycled
-          ? `${result.removed.length} item(s) moved to Recycle Bin.`
-          : `${result.removed.length} item(s) deleted permanently.`,
+          ? `${result.removed.length} item(s) moved to the Recycle Bin successfully.`
+          : `${result.removed.length} item(s) permanently deleted.`,
+        [{ text: "OK", onPress: hideAlert }]
       );
     } catch (err: any) {
       console.error("Deletion failed:", err);
-      Alert.alert("Error", err?.message ?? "Failed to delete selected items.");
+      showAlert("Error", err?.message ?? "Failed to delete selected items.", [{ text: "OK", onPress: hideAlert }]);
     } finally {
       sel.exit();
       setBusy(false);
     }
-  }, [selectedItems, removeItems, sel]);
+  }, [selectedItems, removeItems, sel, showAlert, hideAlert]);
+
+  const confirmDelete = useCallback(() => {
+    if (selectedItems.length === 0) return;
+
+    if (deleteBehavior === "recycle") {
+      showAlert(
+        "Move to Recycle Bin?",
+        `This will move ${selectedItems.length} selected item(s) to the Recycle Bin. They will be automatically deleted after ${recycleRetentionDays} days.\n\nTo delete them permanently, you can go to Settings, open the Recycle Bin, and purge them.`,
+        [
+          { text: "Cancel", onPress: hideAlert, style: "cancel" },
+          { text: "Move to Bin", onPress: () => { hideAlert(); executeDelete(); }, style: "destructive" }
+        ]
+      );
+    } else {
+      showAlert(
+        "Delete permanently?",
+        `Are you sure you want to permanently delete ${selectedItems.length} selected item(s) from your library? This action cannot be undone.`,
+        [
+          { text: "Cancel", onPress: hideAlert, style: "cancel" },
+          { text: "Delete", onPress: () => { hideAlert(); executeDelete(); }, style: "destructive" }
+        ]
+      );
+    }
+  }, [selectedItems, deleteBehavior, recycleRetentionDays, showAlert, hideAlert, executeDelete]);
+
+  const lockItems = useVaultStore((s) => s.lockItems);
+  const handleLockSelected = useCallback(() => {
+    if (selectedItems.length === 0) return;
+    const ids = selectedItems.map((i) => i.id);
+    lockItems(ids);
+    const count = ids.length;
+    sel.exit();
+    showAlert(
+      "Moved to Vault",
+      `${count} item(s) moved to the Private Vault.`,
+      [{ text: "OK", onPress: hideAlert }]
+    );
+  }, [selectedItems, lockItems, sel, showAlert, hideAlert]);
 
   const doShare = useCallback(async () => {
     if (selectedItems.length === 0) return;
@@ -122,11 +186,15 @@ export default function TimelineScreen() {
           height: asset.height ?? 800,
         };
         addItems([newItem]);
-        Alert.alert("Photo Captured", "Captured photo is added to your Timeline!");
+        showAlert(
+          "Photo Captured",
+          "Captured photo is added to your Timeline!",
+          [{ text: "OK", onPress: hideAlert }]
+        );
       }
     } catch (err: any) {
       console.error("Failed to launch camera:", err);
-      Alert.alert("Error", "Could not launch camera.");
+      showAlert("Error", "Could not launch camera.", [{ text: "OK", onPress: hideAlert }]);
     }
   };
 
@@ -168,8 +236,8 @@ export default function TimelineScreen() {
           query
             ? `Nothing matched "${query}".`
             : mediaService.isMock
-            ? "Run npm run gen:samples"
-            : "Grant photo access to see your library."
+              ? "Run npm run gen:samples"
+              : "Grant photo access to see your library."
         }
       />
 
@@ -195,10 +263,18 @@ export default function TimelineScreen() {
           onClose={sel.exit}
           actions={[
             { label: "Share", onPress: doShare, disabled: selectedItems.length === 0 },
-            { label: "Delete", onPress: doDelete, destructive: true, disabled: busy },
+            { label: "Set as Private", onPress: handleLockSelected, disabled: selectedItems.length === 0 },
+            { label: "Delete", onPress: confirmDelete, destructive: true, disabled: busy },
           ]}
         />
       ) : null}
+
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        buttons={alert.buttons}
+      />
     </Screen>
   );
 }
@@ -213,7 +289,7 @@ const styles = StyleSheet.create({
     height: 56,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: "800",
     letterSpacing: -0.5,
   },

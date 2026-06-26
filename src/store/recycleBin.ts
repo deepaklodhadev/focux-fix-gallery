@@ -56,7 +56,7 @@ export const useRecycleBinStore = create<RecycleBinStore>()(
       empty: () => set({ items: [] }),
     }),
     {
-      name: "focuspix.recycleBin",
+      name: "foco.recycleBin",
       storage: createJSONStorage(() => AsyncStorage),
     },
   ),

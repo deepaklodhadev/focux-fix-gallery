@@ -12,7 +12,7 @@ export interface MediaService {
   readonly isMock: boolean;
 
   /** All media, newest first. */
-  getAll(limit?: number): Promise<MediaItem[]>;
+  getAll(limit?: number, offset?: number): Promise<MediaItem[]>;
 
   /**
    * Permanently remove the given items from the device library.

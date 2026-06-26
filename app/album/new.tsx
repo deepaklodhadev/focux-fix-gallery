@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback } from "react";
-import { View, Text, StyleSheet, Pressable, TextInput, FlatList, useWindowDimensions, Alert } from "react-native";
+import { View, Text, StyleSheet, Pressable, TextInput, FlatList, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Screen } from "@/components/Screen";
@@ -10,6 +10,7 @@ import { columnsFor } from "@/utils/grid";
 import { useSettingsStore } from "@/store/settings";
 import type { MediaItem } from "@/types";
 import { radii, spacing } from "@/theme/colors";
+import { CustomAlert, CustomAlertButton } from "@/components/CustomAlert";
 
 export default function NewAlbumScreen() {
   const theme = useTheme();
@@ -20,6 +21,26 @@ export default function NewAlbumScreen() {
 
   const [title, setTitle] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const [alert, setAlert] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    buttons: CustomAlertButton[];
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    buttons: [],
+  });
+
+  const showAlert = useCallback((title: string, message: string, buttons: CustomAlertButton[]) => {
+    setAlert({ visible: true, title, message, buttons });
+  }, []);
+
+  const hideAlert = useCallback(() => {
+    setAlert((a) => ({ ...a, visible: false }));
+  }, []);
 
   const toggle = useCallback((id: string) => {
     setSelected((prev) => {
@@ -33,14 +54,14 @@ export default function NewAlbumScreen() {
   const handleCreate = useCallback(() => {
     const name = title.trim();
     if (!name) {
-      Alert.alert("Name required", "Please enter a name for your album.");
+      showAlert("Name required", "Please enter a name for your album.", [{ text: "OK", onPress: hideAlert }]);
       return;
     }
     const id = createAlbum(name, [...selected]);
-    Alert.alert("Album created", `"${name}" with ${selected.size} photo(s).`, [
-      { text: "OK", onPress: () => router.replace({ pathname: "/album/[id]", params: { id } }) },
+    showAlert("Album created", `"${name}" with ${selected.size} photo(s).`, [
+      { text: "OK", onPress: () => { hideAlert(); router.replace({ pathname: "/album/[id]", params: { id } }); } },
     ]);
-  }, [title, selected, createAlbum, router]);
+  }, [title, selected, createAlbum, router, showAlert, hideAlert]);
 
   return (
     <Screen>
@@ -69,6 +90,13 @@ export default function NewAlbumScreen() {
       </View>
 
       <PickerGrid items={visibleItems} columns={columns} selected={selected} onToggle={toggle} />
+
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        buttons={alert.buttons}
+      />
     </Screen>
   );
 }

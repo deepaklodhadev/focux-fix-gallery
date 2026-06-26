@@ -16,36 +16,28 @@ function folderFromUri(uri: string): string {
 }
 
 async function fromAsset(asset: any, MediaLibrary: any): Promise<MediaItem> {
-  const [uri, mediaType, creationTime, modificationTime, width, height, duration] = await Promise.all([
-    asset.getUri().catch(() => ""),
-    asset.getMediaType().catch(() => MediaLibrary.MediaType.IMAGE),
-    asset.getCreationTime().catch(() => Date.now()),
-    asset.getModificationTime().catch(() => Date.now()),
-    asset.getWidth().catch(() => 0),
-    asset.getHeight().catch(() => 0),
-    asset.getDuration().catch(() => null),
-  ]);
-
-  const normCreation = creationTime ? (creationTime < 10000000000 ? creationTime * 1000 : creationTime) : Date.now();
-  const normMod = modificationTime ? (modificationTime < 10000000000 ? modificationTime * 1000 : modificationTime) : normCreation;
+  const info = await asset.getInfo();
+  const uri = info.uri || "";
+  const normCreation = info.creationTime ? (info.creationTime < 10000000000 ? info.creationTime * 1000 : info.creationTime) : Date.now();
+  const normMod = info.modificationTime ? (info.modificationTime < 10000000000 ? info.modificationTime * 1000 : info.modificationTime) : normCreation;
 
   return {
-    id: asset.id,
+    id: asset.id || info.id,
     uri,
     folder: folderFromUri(uri),
-    width: width ?? 0,
-    height: height ?? 0,
+    width: info.width ?? 0,
+    height: info.height ?? 0,
     creationTime: normCreation,
     modificationTime: normMod,
-    isVideo: mediaType === MediaLibrary.MediaType.VIDEO,
-    duration: duration != null ? Math.round(duration / 1000) : 0, // API returns ms
+    isVideo: info.mediaType === MediaLibrary.MediaType.VIDEO,
+    duration: info.duration != null ? Math.round(info.duration / 1000) : 0, // API returns ms
   };
 }
 
 export const realMediaService: MediaService = {
   isMock: false,
 
-  async getAll(limit?: number): Promise<MediaItem[]> {
+  async getAll(limit?: number, offset?: number): Promise<MediaItem[]> {
     try {
       const MediaLibrary = await import("expo-media-library");
       const perm = await MediaLibrary.requestPermissionsAsync();
@@ -56,6 +48,9 @@ export const realMediaService: MediaService = {
 
       if (limit !== undefined) {
         query = query.limit(limit);
+      }
+      if (offset !== undefined) {
+        query = query.offset(offset);
       }
 
       const assets = await query.exe();
