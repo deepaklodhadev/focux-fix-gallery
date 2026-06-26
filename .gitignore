@@ -1,0 +1,13 @@
+node_modules/
+.expo/
+dist/
+web-build/
+*.log
+.DS_Store
+ios/
+android/
+.env
+
+# Generated sample media (can be regenerated with npm run gen:samples)
+assets/samples/*.png
+assets/samples/samples.json
