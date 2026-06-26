@@ -37,7 +37,7 @@ export async function shareItems(items: MediaItem[]): Promise<void> {
   try {
     await Sharing.shareAsync(items[0].uri, {
       mimeType: items[0].isVideo ? "video/*" : "image/*",
-      dialogTitle: "Share via Foco Gallery",
+      dialogTitle: "Share via FocusPix",
     });
   } catch {
     // Sharing can throw if unsupported/aborted — swallow.

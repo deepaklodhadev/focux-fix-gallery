@@ -255,7 +255,7 @@ export default function SettingsScreen() {
 
         {/* Clean, centered Obsidian-style version info directly on the screen background */}
         <View style={styles.aboutContainer}>
-          <Text style={[styles.aboutTitle, { color: theme.accent }]}>Foco Gallery</Text>
+          <Text style={[styles.aboutTitle, { color: theme.accent }]}>FocusPix</Text>
           <Text style={[styles.aboutSub, { color: theme.textSubtle }]}>
             VERSION {APP_VERSION} · {mediaService.isMock ? "SAMPLE" : "STABLE"}
           </Text>

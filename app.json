@@ -1,18 +1,18 @@
 {
   "expo": {
-    "name": "Foco Gallery",
-    "slug": "foco-gallery",
+    "name": "FocusPix",
+    "slug": "focuspix",
     "version": "0.1.0",
     "orientation": "portrait",
-    "scheme": "foco-gallery",
+    "scheme": "focuspix",
     "userInterfaceStyle": "automatic",
     "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.focogallery.app"
+      "bundleIdentifier": "com.focuspix.app"
     },
     "android": {
-      "package": "com.focogallery.app",
+      "package": "com.focuspix.app",
       "permissions": [
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
@@ -24,8 +24,8 @@
       [
         "expo-media-library",
         {
-          "photosPermission": "Foco Gallery needs access to your photos to show them in your gallery.",
-          "savePhotosPermission": "Foco Gallery needs access to save photos to your library.",
+          "photosPermission": "FocusPix needs access to your photos to show them in your gallery.",
+          "savePhotosPermission": "FocusPix needs access to save photos to your library.",
           "isAccessMediaLocationEnabled": false
         }
       ],

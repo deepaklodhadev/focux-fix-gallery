@@ -1,11 +1,11 @@
-# Foco Gallery 📸
+# FocusPix 📸
 
-Foco Gallery is a high-performance, premium, offline-first photo and video gallery application designed for a smooth, native-like experience. Built with **React Native + Expo**, it features a gorgeous **Obsidian-inspired dark theme** with custom transitions, gesture-driven controls, and sophisticated background media syncing.
+FocusPix is a high-performance, premium, offline-first photo and video gallery application designed for a smooth, native-like experience. Built with **React Native + Expo**, it features a gorgeous **Obsidian-inspired dark theme** with custom transitions, gesture-driven controls, and sophisticated background media syncing.
 
 ---
 
 ## 🎨 Design System & Aesthetics
-Foco Gallery implements a sleek, high-contrast, tactile design system inspired by Obsidian's dark palette:
+FocusPix implements a sleek, high-contrast, tactile design system inspired by Obsidian's dark palette:
 *   **Pure Pitch-Black Background** (`#000000`) for absolute contrast, showcasing media content vibrantly.
 *   **Charcoal Cards** (`#16171b`) and **Elevated Elements** (`#22252a`) to create clear structural depth.
 *   **Vibrant Mint-Teal Accent** (`#24e0b0`) used for pill states, active icons, interactive switches, and stepper buttons.
@@ -16,7 +16,7 @@ Foco Gallery implements a sleek, high-contrast, tactile design system inspired b
 
 ## 📱 Navigation & Features
 
-Foco Gallery is organized around a highly efficient navigation structure:
+FocusPix is organized around a highly efficient navigation structure:
 
 ### 1. 📅 Timeline
 Your media library, ordered newest first and grouped neatly by local calendar day (e.g., *Today*, *Yesterday*, *24 June 2026*).
@@ -58,7 +58,7 @@ An aggregated space for recently deleted assets.
 
 ## ⚡ Performance & Reliability Optimizations
 
-Foco Gallery is built to look, feel, and run like a native device application:
+FocusPix is built to look, feel, and run like a native device application:
 
 *   **🚀 Instant Startup Sync**: Syncs the first 60 assets immediately for interactive visual rendering, continuing the remainder of library loading in incremental background batches of 100 items (separated by 50ms gaps) to prevent UI frame drops.
 *   **🏃 Fast-Scrolling**: Custom right-side fast-scrollbar track immediately scrolls the `FlatList` to corresponding offsets, glowing mint-teal when active and fading to a low-contrast opacity when idle.
@@ -82,7 +82,7 @@ Foco Gallery is built to look, feel, and run like a native device application:
 ## 📂 Project Directory Structure
 
 ```
-foco-gallery/
+focuspix/
 ├── app/                      # Expo Router Navigation Pages
 │   ├── _layout.tsx           # Root navigation layout (Provider initializations)
 │   ├── (tabs)/               # Bottom Tabs
