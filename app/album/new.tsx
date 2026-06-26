@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useCallback } from "react";
-import { View, Text, StyleSheet, Pressable, TextInput, FlatList, useWindowDimensions } from "react-native";
+import { View, Text, StyleSheet, Pressable, TextInput, useWindowDimensions } from "react-native";
+import { FlashList } from "@shopify/flash-list";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Screen } from "@/components/Screen";
@@ -15,7 +16,7 @@ import { CustomAlert, CustomAlertButton } from "@/components/CustomAlert";
 export default function NewAlbumScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { visibleItems } = useMediaLibrary();
+  const { visibleItems, loadMore } = useMediaLibrary();
   const columns = columnsFor(useSettingsStore((s) => s.gridSize));
   const createAlbum = useCustomAlbumsStore((s) => s.createAlbum);
 
@@ -89,7 +90,7 @@ export default function NewAlbumScreen() {
         </Text>
       </View>
 
-      <PickerGrid items={visibleItems} columns={columns} selected={selected} onToggle={toggle} />
+      <PickerGrid items={visibleItems} columns={columns} selected={selected} onToggle={toggle} onEndReached={loadMore} />
 
       <CustomAlert
         visible={alert.visible}
@@ -106,22 +107,26 @@ function PickerGrid({
   columns,
   selected,
   onToggle,
+  onEndReached,
 }: {
   items: MediaItem[];
   columns: number;
   selected: Set<string>;
   onToggle: (id: string) => void;
+  onEndReached?: () => void;
 }) {
   const theme = useTheme();
   const { width } = useWindowDimensions();
   const gap = 2;
   const cell = (width - gap * (columns - 1)) / columns;
   return (
-    <FlatList
+    <FlashList
       data={items}
       keyExtractor={(i) => i.id}
       numColumns={columns}
       contentContainerStyle={{ paddingHorizontal: gap / 2, paddingBottom: 60 }}
+      onEndReached={onEndReached}
+      onEndReachedThreshold={0.5}
       renderItem={({ item }) => {
         const isSel = selected.has(item.id);
         return (

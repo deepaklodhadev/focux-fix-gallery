@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useRef, useCallback } from "react";
-import { FlatList, StyleSheet, View, PanResponder } from "react-native";
+import { StyleSheet, View, PanResponder } from "react-native";
+import { FlashList, FlashListRef } from "@shopify/flash-list";
 import type { MediaItem } from "@/types";
 import { DaySection } from "./DaySection";
 import { EmptyState } from "./EmptyState";
@@ -17,6 +18,8 @@ interface Props {
   emptyTitle?: string;
   emptyMessage?: string;
   ListHeaderComponent?: React.ReactElement | null;
+  onEndReached?: () => void;
+  onEndReachedThreshold?: number;
 }
 
 /**
@@ -34,6 +37,8 @@ export function PhotoGrid({
   emptyTitle,
   emptyMessage,
   ListHeaderComponent,
+  onEndReached,
+  onEndReachedThreshold,
 }: Props) {
   const theme = useTheme();
   const groups = useMemo(() => groupByDay(items), [items]);
@@ -46,7 +51,7 @@ export function PhotoGrid({
   const [isDragging, setIsDragging] = useState(false);
   const [isScrolling, setIsScrolling] = useState(false);
 
-  const flatListRef = useRef<FlatList>(null);
+  const flatListRef = useRef<FlashListRef<any>>(null);
   const initialScrollY = useRef(0);
   const scrollTimeout = useRef<any>(null);
 
@@ -126,7 +131,7 @@ export function PhotoGrid({
 
   return (
     <View style={{ flex: 1, position: "relative" }}>
-      <FlatList
+      <FlashList
         ref={flatListRef}
         data={groups}
         keyExtractor={(g) => g.key}
@@ -143,13 +148,12 @@ export function PhotoGrid({
         )}
         ListHeaderComponent={ListHeaderComponent}
         contentContainerStyle={{ paddingBottom: 40, backgroundColor: theme.bg }}
-        initialNumToRender={6}
-        windowSize={9}
-        removeClippedSubviews
         onScroll={handleScroll}
         scrollEventThrottle={16}
         onContentSizeChange={(w, h) => setContentHeight(h)}
         onLayout={(e) => setContainerHeight(e.nativeEvent.layout.height)}
+        onEndReached={onEndReached}
+        onEndReachedThreshold={onEndReachedThreshold ?? 0.5}
       />
 
       {showScrollbar && (

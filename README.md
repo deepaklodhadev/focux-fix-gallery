@@ -58,11 +58,14 @@ An aggregated space for recently deleted assets.
 
 ## ⚡ Performance & Reliability Optimizations
 
-FocusPix is built to look, feel, and run like a native device application:
+FocusPix is optimized to handle extremely large libraries (10k to 50k+ items) smoothly and efficiently:
 
-*   **🚀 Instant Startup Sync**: Syncs the first 60 assets immediately for interactive visual rendering, continuing the remainder of library loading in incremental background batches of 100 items (separated by 50ms gaps) to prevent UI frame drops.
-*   **🏃 Fast-Scrolling**: Custom right-side fast-scrollbar track immediately scrolls the `FlatList` to corresponding offsets, glowing mint-teal when active and fading to a low-contrast opacity when idle.
-*   **⚡ Paged Viewer Carousel**: Uses horizontal `FlatList` with `pagingEnabled` for smooth, native-feeling gestures. Mounts and plays video elements only on the active slide, releasing player resources instantly on swipe.
+*   **⚡ Shopify's FlashList Integration**: Replaced standard React Native `FlatList` with `@shopify/flash-list` for native-level recycling and cell reuse, yielding smooth 60fps scrolling on large grids.
+*   **🚀 Persistent Metadata Cache**: Stores resolved native asset metadata in a persisted Zustand store (`src/store/mediaCache.ts` backed by `AsyncStorage`), reducing native-to-JS bridge overhead to zero for cached files.
+*   **⚙️ Background Indexing Worker**: Runs an idle-priority background indexing routine on launch to incrementally parse, resolve, and cache new media items without blockages or UI frame drops.
+*   **📦 Scroll-Driven Lazy Loading**: Fetches the library in paginated increments (100 items initially, loading subsequent pages as you scroll), preventing massive memory footprints.
+*   **🏃 Fast-Scrolling**: Custom right-side fast-scrollbar track immediately scrolls the list to corresponding offsets, glowing mint-teal when active and fading to a low-contrast opacity when idle.
+*   **⚡ Paged Viewer Carousel**: Uses a horizontal layout with `pagingEnabled` for smooth, native-feeling gestures. Mounts and plays video elements only on the active slide, releasing player resources instantly on swipe.
 *   **🛡️ Platform Immunity**: Solves simulator/web crashes by dynamically importing `expo-media-library` at runtime. Wraps filesystem deletions in strict safety checks so loading indicators dismiss properly even on filesystem failure.
 
 ---
@@ -112,7 +115,8 @@ focuspix/
 │   │   ├── settings.ts       # Exclusions, display, and retention state
 │   │   ├── recycleBin.ts     # Recycled items store
 │   │   ├── customAlbums.ts   # User albums store
-│   │   └── vault.ts          # Persisted private IDs and passcode
+│   │   ├── vault.ts          # Persisted private IDs and passcode
+│   │   └── mediaCache.ts     # Persisted metadata cache for high performance
 │   ├── hooks/                # Performance wrappers
 │   │   ├── useMediaLibrary.ts# Library items resolution with active private exclusions
 │   │   └── useSelection.ts   # Shared selection state hook

@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useCallback } from "react";
-import { View, Text, StyleSheet, Pressable, FlatList, useWindowDimensions } from "react-native";
+import { View, Text, StyleSheet, Pressable, useWindowDimensions } from "react-native";
+import { FlashList } from "@shopify/flash-list";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -250,7 +251,7 @@ export default function RecycleScreen() {
           </Text>
         </View>
       ) : (
-        <FlatList
+        <FlashList
           data={items}
           keyExtractor={(i) => i.id}
           numColumns={columns}

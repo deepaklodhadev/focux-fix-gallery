@@ -7,7 +7,10 @@ interface MediaStore {
   loading: boolean;
   loaded: boolean;
   error: string | null;
+  offset: number;
+  hasMore: boolean;
   fetchMedia: (force?: boolean) => Promise<void>;
+  loadMore: () => Promise<void>;
   removeItems: (ids: string[]) => void;
   addItems: (items: MediaItem[]) => void;
 }
@@ -19,63 +22,75 @@ export const useMediaStore = create<MediaStore>((set, get) => ({
   loading: false,
   loaded: false,
   error: null,
+  offset: 0,
+  hasMore: true,
   fetchMedia: async (force = false) => {
     if (get().loading || (get().loaded && !force)) return;
 
     set({ loading: true, error: null });
     const fetchId = ++activeFetchId;
+
+    // Start background indexing of metadata cache
+    if (mediaService.startBackgroundIndexing) {
+      mediaService.startBackgroundIndexing();
+    }
+
     try {
-      // Step 1: Fetch the first 60 assets instantly (takes ~50-100ms)
-      const firstPage = await mediaService.getAll(60);
-      
+      const limit = 100;
+      const firstPage = await mediaService.getAll(limit, 0);
+
       if (fetchId !== activeFetchId) return;
-      set({ items: firstPage, loaded: true, loading: false });
-
-      // Step 2: Fetch remaining items in the background incrementally without blocking the UI
-      (async () => {
-        let offset = 60;
-        const limit = 100;
-        let hasMore = true;
-
-        while (hasMore) {
-          await new Promise((resolve) => setTimeout(resolve, 50));
-          if (fetchId !== activeFetchId) break;
-
-          const nextPage = await mediaService.getAll(limit, offset);
-          if (fetchId !== activeFetchId) break;
-
-          if (nextPage.length === 0) {
-            hasMore = false;
-            break;
-          }
-
-          const currentItems = get().items;
-          const capturedIds = new Set(
-            currentItems.filter((i) => i.id.startsWith("captured_")).map((i) => i.id)
-          );
-
-          const capturedItems = currentItems.filter((i) => capturedIds.has(i.id));
-          const otherCurrentItems = currentItems.filter((i) => !capturedIds.has(i.id));
-          const existingIds = new Set(otherCurrentItems.map((i) => i.id));
-
-          const newUniquePage = nextPage.filter((i) => !existingIds.has(i.id));
-          if (newUniquePage.length === 0) {
-            hasMore = false;
-            break;
-          }
-
-          const merged = [...capturedItems, ...otherCurrentItems, ...newUniquePage];
-          merged.sort((a, b) => b.creationTime - a.creationTime);
-
-          set({ items: merged });
-          offset += nextPage.length;
-        }
-      })().catch((err) => {
-        console.warn("Background media fetch failed:", err);
+      set({
+        items: firstPage,
+        loaded: true,
+        loading: false,
+        offset: firstPage.length,
+        hasMore: firstPage.length === limit,
       });
     } catch (err: any) {
       if (fetchId === activeFetchId) {
         set({ error: err?.message ?? "Failed to load media", loading: false });
+      }
+    }
+  },
+  loadMore: async () => {
+    const { loading, hasMore, offset, items } = get();
+    if (loading || !hasMore) return;
+
+    set({ loading: true });
+    const fetchId = activeFetchId;
+
+    try {
+      const limit = 100;
+      const nextPage = await mediaService.getAll(limit, offset);
+
+      if (fetchId !== activeFetchId) return;
+
+      if (nextPage.length === 0) {
+        set({ hasMore: false, loading: false });
+        return;
+      }
+
+      const existingIds = new Set(items.map((i) => i.id));
+      const newUniquePage = nextPage.filter((i) => !existingIds.has(i.id));
+
+      if (newUniquePage.length === 0) {
+        set({ hasMore: false, loading: false });
+        return;
+      }
+
+      const merged = [...items, ...newUniquePage];
+      merged.sort((a, b) => b.creationTime - a.creationTime);
+
+      set({
+        items: merged,
+        loading: false,
+        offset: offset + nextPage.length,
+        hasMore: nextPage.length === limit,
+      });
+    } catch (err: any) {
+      if (fetchId === activeFetchId) {
+        set({ error: err?.message ?? "Failed to load more media", loading: false });
       }
     }
   },
@@ -90,6 +105,7 @@ export const useMediaStore = create<MediaStore>((set, get) => ({
       const merged = [...s.items, ...newItems.filter((i) => !existing.has(i.id))];
       return {
         items: merged.sort((a, b) => b.creationTime - a.creationTime),
+        offset: s.offset + newItems.filter((i) => !existing.has(i.id)).length,
       };
     });
   },

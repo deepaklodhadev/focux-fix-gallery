@@ -20,7 +20,7 @@ export default function AlbumDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const theme = useTheme();
-  const { visibleItems, removeItems } = useMediaLibrary();
+  const { visibleItems, removeItems, loadMore } = useMediaLibrary();
   const columns = columnsFor(useSettingsStore((s) => s.gridSize));
   const customAlbums = useCustomAlbumsStore((s) => s.albums);
   const deleteAlbum = useCustomAlbumsStore((s) => s.deleteAlbum);
@@ -196,6 +196,7 @@ export default function AlbumDetailScreen() {
         onLongPress={(item) => !sel.mode && sel.enter(item.id)}
         emptyTitle="Empty album"
         emptyMessage={isCustom ? "Add photos to this album." : "No photos in this folder."}
+        onEndReached={loadMore}
       />
 
       {sel.mode ? (

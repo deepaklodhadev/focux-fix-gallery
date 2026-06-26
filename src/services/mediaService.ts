@@ -22,6 +22,9 @@ export interface MediaService {
 
   /** Saves a local photo URI to the device gallery and returns the asset info. */
   savePhoto(uri: string): Promise<{ id: string; uri: string }>;
+
+  /** Starts background metadata resolution and caching worker thread */
+  startBackgroundIndexing?(): void;
 }
 
 export interface AlbumService {

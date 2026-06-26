@@ -21,7 +21,7 @@ import { CustomAlert, CustomAlertButton } from "@/components/CustomAlert";
 export default function TimelineScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { visibleItems, loading, reload, removeItems, addItems } = useMediaLibrary();
+  const { visibleItems, loading, reload, removeItems, addItems, loadMore } = useMediaLibrary();
   const gridSize = useSettingsStore((s) => s.gridSize);
   const columns = useMemo(() => columnsFor(gridSize), [gridSize]);
 
@@ -239,6 +239,7 @@ export default function TimelineScreen() {
               ? "Run npm run gen:samples"
               : "Grant photo access to see your library."
         }
+        onEndReached={loadMore}
       />
 
       {/* Floating Action Button containing only '+' */}

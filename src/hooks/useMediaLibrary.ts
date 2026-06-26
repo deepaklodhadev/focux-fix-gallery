@@ -8,7 +8,7 @@ import { useVaultStore } from "@/store/vault";
  * The underlying items are managed globally in useMediaStore to avoid redundant fetches.
  */
 export function useMediaLibrary() {
-  const { items, loading, loaded, fetchMedia, removeItems, addItems } = useMediaStore();
+  const { items, loading, loaded, fetchMedia, removeItems, addItems, loadMore } = useMediaStore();
 
   const showVideos = useSettingsStore((s) => s.showVideos);
   const hiddenFolders = useSettingsStore((s) => s.hiddenFolders);
@@ -33,5 +33,6 @@ export function useMediaLibrary() {
     reload: () => fetchMedia(true),
     removeItems,
     addItems,
+    loadMore,
   };
 }
